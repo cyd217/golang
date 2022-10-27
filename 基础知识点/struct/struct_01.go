@@ -4,7 +4,7 @@ import "fmt"
 
 func main() {
 	//NewStruct()
-	//SameSruct()
+	SameSruct()
 }
 
 func SameSruct() {
