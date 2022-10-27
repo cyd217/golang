@@ -34,3 +34,5 @@ interface是一组method的集合。接口做的事情就像是定义一个协�
 ### interface_03.go
 - 空接口
 - 断言
+
+
