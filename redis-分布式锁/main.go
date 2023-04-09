@@ -6,15 +6,13 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/go-redis/redis/v8"
 )
 
-var rdb = redis.NewClient(&redis.Options{
+/*var rdb = redis.NewClient(&redis.Options{
 	Addr:     "localhost:6379",
 	Password: "", // no password set
 	DB:       0,  // use default DB
-})
+})*/
 
 type RedisLock struct {
 	key      string
@@ -47,7 +45,7 @@ func NewRedisLock(key string, expire ...time.Duration) RedisLock {
 
 // 加锁
 func (r *RedisLock) KeyLock(ctx context.Context, redisLock RedisLock) (bool, error) {
-	setLock, err := rdb.SetNX(ctx, redisLock.key, redisLock.value, redisLock.duration).Result()
+	setLock, err := Instance.SetNX(ctx, redisLock.key, redisLock.value, redisLock.duration)
 	if err != nil {
 		return false, err
 	}
@@ -55,7 +53,7 @@ func (r *RedisLock) KeyLock(ctx context.Context, redisLock RedisLock) (bool, err
 }
 
 // 释放锁
-func (r *RedisLock) DelByKeyWhenValueEquals(ctx context.Context, rdb *redis.Client, redisLock RedisLock) (bool, error) {
+func (r *RedisLock) DelByKeyWhenValueEquals(ctx context.Context, redisLock RedisLock) (bool, error) {
 	lua := `
         if redis.call('GET', KEYS[1]) == ARGV[1] then
          	return redis.call('DEL', KEYS[1])
@@ -64,7 +62,7 @@ func (r *RedisLock) DelByKeyWhenValueEquals(ctx context.Context, rdb *redis.Clie
         end
         `
 	scriptKeys := []string{redisLock.key}
-	val, err := rdb.Eval(ctx, lua, scriptKeys, redisLock.value).Result()
+	val, err := Instance.Eval(ctx, lua, scriptKeys, redisLock.value)
 	if err != nil {
 		return false, err
 	}
@@ -72,7 +70,7 @@ func (r *RedisLock) DelByKeyWhenValueEquals(ctx context.Context, rdb *redis.Clie
 }
 
 // 守护线程 延迟锁的过期时间
-func (r *RedisLock) WatchDog(ctx context.Context, rdb *redis.Client, redisLock RedisLock) {
+func (r *RedisLock) WatchDog(ctx context.Context, redisLock RedisLock) {
 	for {
 		select {
 		// 业务完成
@@ -82,7 +80,7 @@ func (r *RedisLock) WatchDog(ctx context.Context, rdb *redis.Client, redisLock R
 		// 业务未完成
 		default:
 			// 自动续期
-			rdb.PExpire(ctx, redisLock.key, redisLock.duration)
+			Instance.PExpire(ctx, redisLock.key, redisLock.duration)
 			// 继续等待
 			time.Sleep(redisLock.duration / 2)
 		}
